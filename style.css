@@ -755,6 +755,8 @@ footer {
   color: white;
   background-size: cover;
   background-position: center;
+  /* >>> IDAGDAG ANG LINYANG ITO SA IBABA <<< */
+  background-image: url('pnhs1.jpg');
   transition: background-image 1.5s ease-in-out; /* Smooth fade effect sa pagpalit ng larawan */
 }
 
