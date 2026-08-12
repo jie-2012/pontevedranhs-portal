@@ -255,24 +255,34 @@ function handleLogout() {
 }
 
 // ==========================================
-// 7. LOGIN / AUTHENTICATION HANDLER (FIXED)
+// 7. LOGIN / AUTHENTICATION HANDLER
 // ==========================================
 async function handleAuthSubmit(event) {
   event.preventDefault();
 
-  // Hanapin ang login input gamit ang ID o kahit anong unang input field sa form
-  const emailInput = document.getElementById("login-email") 
-                  || document.getElementById("login-lrn")
-                  || event.target.querySelector('input');
+  // Kunin ang lahat ng text/email/number input sa loob ng form na pino-post
+  const inputs = event.target.querySelectorAll('input');
+  let userIdentifier = "";
 
-  const userIdentifier = emailInput ? emailInput.value : "";
+  // Hanapin ang input field na may laman
+  inputs.forEach(input => {
+    if (input.type !== 'password' && input.type !== 'submit' && input.value.trim() !== "") {
+      userIdentifier = input.value.trim();
+    }
+  });
 
-  if (!userIdentifier.trim()) {
+  if (!userIdentifier) {
     alert("Mangyaring ilagay ang iyong LRN o DepEd Email.");
     return;
   }
 
-  // 1. I-save ang nag-login na user sa localStorage
+  // OPTION: Kung gusto mong lagyan ng (Admin) badge sa tabi ng pangalan mo:
+  // Kusa nitong idadagdag ang "Admin - " kung admin email ang ginamit
+  if (userIdentifier.toLowerCase().includes("admin") || userIdentifier.toLowerCase().includes("junjie")) {
+    userIdentifier = "Admin - " + userIdentifier;
+  }
+
+  // 1. I-save sa localStorage para mabasa sa feed.html
   localStorage.setItem("loggedInUser", userIdentifier);
 
   // 2. Lumipat sa feed.html
