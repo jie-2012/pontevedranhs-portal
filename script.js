@@ -255,14 +255,17 @@ function handleLogout() {
 }
 
 // ==========================================
-// 7. LOGIN / AUTHENTICATION HANDLER
+// 7. LOGIN / AUTHENTICATION HANDLER (FIXED)
 // ==========================================
 async function handleAuthSubmit(event) {
   event.preventDefault();
 
-  // Kunin ang inilagay na Email o LRN
-  const emailInput = document.querySelector('input[type="text"], input[type="email"]');
-  const userIdentifier = emailInput ? emailInput.value : "User";
+  // Hanapin ang login input gamit ang ID o kahit anong unang input field sa form
+  const emailInput = document.getElementById("login-email") 
+                  || document.getElementById("login-lrn")
+                  || event.target.querySelector('input');
+
+  const userIdentifier = emailInput ? emailInput.value : "";
 
   if (!userIdentifier.trim()) {
     alert("Mangyaring ilagay ang iyong LRN o DepEd Email.");
@@ -272,7 +275,7 @@ async function handleAuthSubmit(event) {
   // 1. I-save ang nag-login na user sa localStorage
   localStorage.setItem("loggedInUser", userIdentifier);
 
-  // 2. Magpakita ng tagumpay na mensahe at lumipat sa feed.html
+  // 2. Lumipat sa feed.html
   alert("Maligayang pagbabalik! Pagpasok sa portal...");
   window.location.href = "feed.html";
 }
