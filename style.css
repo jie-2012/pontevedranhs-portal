@@ -815,3 +815,66 @@ footer {
   background-color: #f1f5f9;
   transform: translateY(-2px);
 }
+
+/* ==========================================
+   MOBILE RESPONSIVE FIXES
+   ========================================== */
+
+/* 1. Navbar Fixes para sa Mobile Screen */
+@media (max-width: 768px) {
+  nav.navbar {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10px 15px !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+  }
+
+  .nav-brand span {
+    font-size: 1rem !important;
+  }
+
+  .feed-nav-logo {
+    width: 35px !important;
+    height: 35px !important;
+  }
+
+  .nav-links {
+    gap: 8px !important;
+  }
+
+  .nav-links a, .profile-btn {
+    padding: 6px 10px !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* 2. Content & Header Fixes */
+  .feed-page-container, main {
+    padding: 0 12px !important;
+    margin: 20px auto !important;
+  }
+
+  h1, h2, .feed-header h2 {
+    font-size: 1.5rem !important;
+  }
+
+  p {
+    font-size: 0.95rem !important;
+  }
+
+  /* 3. Filter Buttons Layout */
+  .filter-container {
+    gap: 6px !important;
+  }
+
+  .filter-btn {
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* 4. Post Cards */
+  .post-card {
+    padding: 15px !important;
+  }
+}
