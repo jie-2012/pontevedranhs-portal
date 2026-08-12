@@ -1,7 +1,6 @@
 // ==========================================
 // 1. SUPABASE INITIALIZATION
 // ==========================================
-// PALITAN ANG DALAWANG ITO NG IYONG TUNAY NA SUPABASE CREDENTIALS
 const SUPABASE_URL = 'https://vykcbiupbdtegtcdtzda.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_OEUink5V4daPeQbXuNlyAw_bCehIOZd';
 
@@ -10,27 +9,55 @@ if (typeof supabase !== 'undefined') {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
+// Helper Function: Linisin ang email/identifier para Pangalan/Role lang ang idisplay
+function formatDisplayName(rawUser) {
+  if (!rawUser) return "Estudyante";
+  
+  let name = rawUser.trim();
+  
+  // Kung may '-' tulad ng "Admin - junjie.magada001@deped.gov.ph", kunin lang ang "Admin"
+  if (name.includes(' - ')) {
+    name = name.split(' - ')[0];
+  }
+  
+  // Kung may email symbol ('@'), kunin lang ang prefix bago ang '@'
+  if (name.includes('@')) {
+    name = name.split('@')[0];
+  }
+
+  // Kung admin ang sinusubukang ipasok, tiyaking "Admin" ang lalabas
+  if (name.toLowerCase().includes("admin")) {
+    return "Admin";
+  }
+
+  // I-capitalize ang unang letra para malinis tingnan
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 // ==========================================
 // 2. USER SESSION & NAVBAR MANAGEMENT
 // ==========================================
 let storedUser = localStorage.getItem("loggedInUser");
-let currentUser = "Estudyante"; // Default fallback
+let currentUserRaw = "Estudyante"; // Raw identifier (para sa ownership check)
+let currentUserDisplay = "Estudyante"; // Malinis na pangalan (para sa UI)
 
 if (storedUser) {
   try {
     let parsedData = JSON.parse(storedUser);
-    currentUser = parsedData.name || parsedData.email || storedUser;
+    currentUserRaw = parsedData.name || parsedData.email || storedUser;
   } catch (e) {
-    currentUser = storedUser;
+    currentUserRaw = storedUser;
   }
 }
 
+currentUserDisplay = formatDisplayName(currentUserRaw);
+
 // Kapag nag-load ang DOM
 document.addEventListener("DOMContentLoaded", () => {
-  // Update Username sa Navbar
+  // Update Username sa Navbar (Formatted Name)
   const navUsername = document.getElementById("nav-username");
   if (navUsername) {
-    navUsername.innerText = currentUser;
+    navUsername.innerText = currentUserDisplay;
   }
 
   // Load Posts sa Feed (kung nasa feed.html)
@@ -96,11 +123,12 @@ async function fetchPosts(category = 'All') {
 
 // Function para sa Post Card HTML
 function renderPostCard(post) {
-  const postAuthor = post.author || "Anonymous";
+  const rawAuthor = post.author || "Anonymous";
+  const displayAuthor = formatDisplayName(rawAuthor); // Tanging Pangalan / Role lang ang ipapakita
   const postDate = post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Ngayon';
 
-  const isOwner = (currentUser.toLowerCase() === postAuthor.toLowerCase());
-  const isAdmin = (currentUser.toLowerCase().includes("admin"));
+  const isOwner = (currentUserRaw.toLowerCase() === rawAuthor.toLowerCase());
+  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || currentUserDisplay.toLowerCase().includes("admin"));
 
   // Ipakita ang delete button kapag owner o admin
   const deleteBtnHTML = (isOwner || isAdmin)
@@ -126,7 +154,7 @@ function renderPostCard(post) {
     <div class="post-card">
       <div class="post-header">
         <div>
-          <strong style="color: #1e3a8a;">📌 ${postAuthor}</strong> 
+          <strong style="color: #1e3a8a;">📌 ${displayAuthor}</strong> 
           <small style="color: #64748b; margin-left: 5px;">(${postDate})</small>
         </div>
         ${deleteBtnHTML}
@@ -183,12 +211,12 @@ async function handleCreatePost(event) {
       imageUrl = publicUrlData.publicUrl;
     }
 
-    // 2. I-save sa Supabase 'posts' table
+    // 2. I-save sa Supabase 'posts' table (Isasave bilang Malinis na Display Name)
     const { error: insertError } = await supabaseClient
       .from('posts')
       .insert([
         {
-          author: currentUser,
+          author: currentUserDisplay, 
           content: text,
           image_url: imageUrl,
           category: category
@@ -273,7 +301,6 @@ function handleLogout() {
 async function handleAuthSubmit(event) {
   event.preventDefault();
 
-  // Hanapin ang kahit anong visible text o email input sa loob ng form
   const inputs = event.target.querySelectorAll('input');
   let userIdentifier = "";
 
@@ -288,12 +315,7 @@ async function handleAuthSubmit(event) {
     return;
   }
 
-  // Awtomatikong maglagay ng Admin badge kung admin o pangalan mo
-  if (userIdentifier.toLowerCase().includes("admin") || userIdentifier.toLowerCase().includes("junjie")) {
-    userIdentifier = "Admin - " + userIdentifier;
-  }
-
-  // Save sa localStorage at lipat sa feed
+  // I-save ang identifier sa localStorage
   localStorage.setItem("loggedInUser", userIdentifier);
   alert("Maligayang pagbabalik! Pagpasok sa portal...");
   window.location.href = "feed.html";
