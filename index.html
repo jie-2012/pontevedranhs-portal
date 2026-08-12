@@ -201,5 +201,21 @@
   </footer>
 
   <script src="script.js"></script>
+
+  <script>
+  // Kapag nag-load ang index.html, i-check kung may active session na sa localStorage
+  document.addEventListener("DOMContentLoaded", () => {
+    const loggedUser = localStorage.getItem("loggedInUser");
+    const loginBtn = document.querySelector('a[href*="#login"], .login-btn, nav a.btn-primary');
+
+    if (loggedUser && loginBtn) {
+      // Palitan ang "Login" button para maging Dashboard/Portal button
+      loginBtn.innerText = "Pumasok sa Bulletin Feed";
+      loginBtn.href = "feed.html";
+      loginBtn.style.backgroundColor = "#2563eb"; // Optional styling
+    }
+  });
+</script>
+
 </body>
 </html>
