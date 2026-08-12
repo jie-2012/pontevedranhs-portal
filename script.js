@@ -1,381 +1,255 @@
 // ==========================================
-// 1. KONEKSYON SA SUPABASE
+// 1. SUPABASE INITIALIZATION
 // ==========================================
-const SUPABASE_URL = 'https://vykcbiupbdtegtcdtzda.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_OEUink5V4daPeQbXuNlyAw_bCehIOZd'; 
+// Siguraduhing papalitan ang URL at KEY ng sa sarili mong Supabase Credentials kung kinakailangan
+const SUPABASE_URL = 'https://YOUR_SUPABASE_URL.supabase.co';
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Encrypted Hash ng Admin Email para sa proteksyon ng iyong privacy
-const ADMIN_EMAIL_HASH = "8ba7bdf3545b6db7f5ed64c3f5ea6c4d7e98d91bcfbbd405fbdf9a2c3a516016";
-
-// Helper function para sa pagsusuri ng admin identity (SHA-256)
-async function hashEmail(email) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(email.trim().toLowerCase());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+let supabaseClient = null;
+if (typeof supabase !== 'undefined') {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-let isRegisterMode = false;
+// ==========================================
+// 2. USER SESSION & NAVBAR MANAGEMENT
+// ==========================================
+// Kunin ang naka-login na user mula sa localStorage
+let storedUser = localStorage.getItem("loggedInUser");
+let currentUser = "Estudyante"; // Default name
 
-// Pag-load ng page, i-check ang session, posts, at carousel
+if (storedUser) {
+  try {
+    let parsedData = JSON.parse(storedUser);
+    currentUser = parsedData.name || parsedData.email || storedUser;
+  } catch (e) {
+    currentUser = storedUser;
+  }
+}
+
+// Kapag nag-load ang page, i-update ang pangalan sa Navbar
 document.addEventListener("DOMContentLoaded", () => {
-  checkUserSession();
-  loadPosts();
-  updateDynamicSchoolYear();
-  startSchoolCarousel();
-  checkUrlParameters();
+  const navUsername = document.getElementById("nav-username");
+  if (navUsername) {
+    navUsername.innerText = currentUser;
+  }
+
+  // Load posts mula sa database
+  fetchPosts('All');
+
+  // Event listener para sa Upload/Post Form
+  const uploadForm = document.getElementById("upload-form");
+  if (uploadForm) {
+    uploadForm.addEventListener("submit", handleCreatePost);
+  }
 });
 
 // ==========================================
-// 2. TOGGLE AUTH MODE (LOGIN / REGISTER)
+// 3. FETCH & DISPLAY POSTS
 // ==========================================
-function toggleAuthMode(event) {
-  if (event) event.preventDefault();
+async function fetchPosts(category = 'All') {
+  const feedGrid = document.getElementById("all-posts-feed");
+  if (!feedGrid) return;
 
-  isRegisterMode = !isRegisterMode;
+  feedGrid.innerHTML = "<p style='color: #64748b;'>Kina-karga ang mga anunsyo...</p>";
 
-  const authTitle = document.getElementById('auth-title');
-  const authSubtitle = document.getElementById('auth-subtitle');
-  const fullnameGroup = document.getElementById('fullname-group');
-  const submitBtn = document.getElementById('auth-submit-btn');
-  const toggleText = document.getElementById('auth-toggle-text');
+  try {
+    let query = supabaseClient.from('posts').select('*').order('created_at', { ascending: false });
 
-  if (isRegisterMode) {
-    if (authTitle) authTitle.textContent = "Gumawa ng Account";
-    if (authSubtitle) authSubtitle.textContent = "Mag-register bilang Mag-aaral o Guro";
-    if (fullnameGroup) fullnameGroup.style.display = "block";
-    if (submitBtn) submitBtn.textContent = "Mag-register";
-    if (toggleText) {
-      toggleText.innerHTML = 'May account ka na? <a href="#" onclick="toggleAuthMode(event)" style="color: #1e3a8a; font-weight: bold; text-decoration: none;">Mag-login dito</a>';
+    if (category !== 'All') {
+      query = query.eq('category', category);
     }
-  } else {
-    if (authTitle) authTitle.textContent = "Portal Login";
-    if (authSubtitle) authSubtitle.textContent = "Pontevedra NHS Student & Faculty Access";
-    if (fullnameGroup) fullnameGroup.style.display = "none";
-    if (submitBtn) submitBtn.textContent = "Mag-login";
-    if (toggleText) {
-      toggleText.innerHTML = 'Wala pang account? <a href="#" onclick="toggleAuthMode(event)" style="color: #1e3a8a; font-weight: bold; text-decoration: none;">Mag-register dito</a>';
-    }
-  }
-}
 
-// ==========================================
-// 3. AUTH SUBMISSION (LOGIN AT REGISTER)
-// ==========================================
-async function handleAuthSubmit(e) {
-  e.preventDefault();
-
-  const email = document.getElementById('auth-username').value;
-  const password = document.getElementById('auth-password').value;
-
-  if (isRegisterMode) {
-    const fullnameInput = document.getElementById('reg-fullname');
-    const fullname = fullnameInput ? fullnameInput.value : '';
-
-    const { data, error } = await supabaseClient.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        data: { full_name: fullname }
-      }
-    });
+    const { data: posts, error } = await query;
 
     if (error) {
-      alert("Error sa registration: " + error.message);
-    } else {
-      alert("Matagumpay ang registration! Pwede ka nang mag-login.");
-      document.getElementById('auth-form').reset();
-      toggleAuthMode();
+      console.error("Error fetching posts:", error);
+      feedGrid.innerHTML = "<p style='color: #dc2626;'>Nagka-error sa pag-load ng mga post.</p>";
+      return;
     }
-  } else {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
 
-    if (error) {
-      alert("Maling Email o Password: " + error.message);
-    } else {
-      alert("Maligayang pagbabalik!");
-      checkUserSession();
+    if (!posts || posts.length === 0) {
+      feedGrid.innerHTML = "<p style='color: #64748b;'>Wala pang naitatalang post sa kategoryang ito.</p>";
+      return;
     }
+
+    // I-render ang mga posts
+    feedGrid.innerHTML = posts.map(post => renderPostCard(post)).join('');
+
+  } catch (err) {
+    console.error("Unexpected error:", err);
   }
 }
 
-// ==========================================
-// 4. CHECK USER SESSION & UPDATE UI (WITH SECURE ADMIN DETECTION)
-// ==========================================
-async function checkUserSession() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
+// Function para sa paggawa ng HTML Card ng bawat Post
+function renderPostCard(post) {
+  const postAuthor = post.author || "Anonymous";
+  const postDate = post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Ngayon';
 
-  const navBtn = document.getElementById('nav-login-btn');
-  const authTitle = document.getElementById('auth-title');
-  const submitBtn = document.getElementById('auth-submit-btn');
-  const authForm = document.getElementById('auth-form');
+  // I-check kung ang naka-login ay ang may-ari ng post o Admin
+  const isOwner = (currentUser.toLowerCase() === postAuthor.toLowerCase());
+  const isAdmin = (currentUser.toLowerCase().includes("admin"));
 
-  if (user) {
-    const displayName = user.user_metadata?.full_name || user.email;
-    const userHash = await hashEmail(user.email);
-    const isAdmin = (userHash === ADMIN_EMAIL_HASH);
+  // Ipakita lang ang Delete button kung Owner o Admin
+  const deleteBtnHTML = (isOwner || isAdmin)
+    ? `<button class="delete-post-btn" onclick="deletePost('${post.id}')">🗑️ Burahin</button>`
+    : '';
 
-    if (navBtn) {
-      navBtn.innerText = isAdmin ? `👑 Admin (${displayName})` : `👤 ${displayName}`;
+  // AUTOMATIC DETECTION: IMAGE BA O VIDEO ANG MEDIA?
+  let mediaHTML = '';
+  if (post.image_url) {
+    const url = post.image_url.toLowerCase();
+    if (url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || url.endsWith('.mkv')) {
+      mediaHTML = `
+        <video controls style="max-width:100%; border-radius:8px; margin-top: 10px; display: block;">
+          <source src="${post.image_url}" type="video/mp4">
+          Hindi masuportahan ng iyong browser ang video player na ito.
+        </video>`;
+    } else {
+      mediaHTML = `<img src="${post.image_url}" alt="Post Media" style="max-width:100%; border-radius:8px; margin-top: 10px; display: block;" onerror="this.style.display='none'">`;
     }
-    
-    if (authTitle) {
-      authTitle.innerText = isAdmin 
-        ? `Naka-login ka bilang Admin: ${displayName}` 
-        : `Naka-login ka na bilang: ${displayName}`;
-    }
-    
-    if (submitBtn) {
-      submitBtn.innerText = `Mag-logout`;
-    }
-
-    if (authForm) {
-      authForm.onsubmit = async function(e) {
-        e.preventDefault();
-        await supabaseClient.auth.signOut();
-        alert("Naka-logout ka na.");
-        location.reload();
-      };
-    }
-
-    // I-render muli ang posts para lumitaw ang Admin Delete buttons
-    loadPosts();
-    checkUrlParameters();
   }
+
+  return `
+    <div class="post-card">
+      <div class="post-header">
+        <div>
+          <strong style="color: #1e3a8a;">📌 ${postAuthor}</strong> 
+          <small style="color: #64748b; margin-left: 5px;">(${postDate})</small>
+        </div>
+        ${deleteBtnHTML}
+      </div>
+      <p style="margin: 15px 0; color: #334155; line-height: 1.5;">${post.content || post.text || ''}</p>
+      ${mediaHTML}
+    </div>
+  `;
 }
 
 // ==========================================
-// 5. MODAL CONTROL FOR POSTING
+// 4. CREATE POST FUNCTION (DIRECT UPLOAD FOR IMAGE/VIDEO)
 // ==========================================
-async function openPostModal(category) {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  
-  if (!user) {
-    alert("Kailangan mo munang mag-login bago makapag-post!");
-    window.location.href = "#login";
+async function handleCreatePost(event) {
+  event.preventDefault();
+
+  const textInput = document.getElementById("post-text");
+  const fileInput = document.getElementById("post-file");
+  const categoryInput = document.getElementById("post-category");
+
+  const text = textInput ? textInput.value : "";
+  const file = fileInput && fileInput.files[0] ? fileInput.files[0] : null;
+  const category = categoryInput ? categoryInput.value : "Academics & Clubs";
+
+  if (!text.trim()) {
+    alert("Mangyaring maglagay ng mensahe.");
     return;
   }
-  
-  const postCategory = document.getElementById('post-category');
-  const modalTitle = document.getElementById('modal-category-title');
-  const postModal = document.getElementById('post-modal');
 
-  if (postCategory) postCategory.value = category;
-  if (modalTitle) modalTitle.innerText = `Mag-post sa ${category}`;
-  if (postModal) postModal.style.display = "flex";
-}
+  let imageUrl = null;
 
-function closePostModal() {
-  const postModal = document.getElementById('post-modal');
-  if (postModal) postModal.style.display = "none";
+  try {
+    // 1. KUNG MAY PINILING FILE (IMAGE O VIDEO), I-UPLOAD SA SUPABASE STORAGE BUCKET 'post-images'
+    if (file) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabaseClient
+        .storage
+        .from('post-images')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        alert("Nagka-error sa pag-upload ng media: " + uploadError.message);
+        return;
+      }
+
+      // Kunin ang pampublikong URL link ng na-upload na file
+      const { data: publicUrlData } = supabaseClient
+        .storage
+        .from('post-images')
+        .getPublicUrl(fileName);
+
+      imageUrl = publicUrlData.publicUrl;
+    }
+
+    // 2. I-SAVE ANG DATA SA SUPABASE DATABASE TABLE 'posts'
+    const { error: insertError } = await supabaseClient
+      .from('posts')
+      .insert([
+        {
+          author: currentUser,
+          content: text,
+          image_url: imageUrl,
+          category: category
+        }
+      ]);
+
+    if (insertError) {
+      alert("Nagka-error sa pag-save ng post: " + insertError.message);
+    } else {
+      alert("Matagumpay na na-post ang anunsyo!");
+      closePostModal();
+      textInput.value = "";
+      if (fileInput) fileInput.value = "";
+      fetchPosts('All'); // Refresh posts display
+    }
+
+  } catch (err) {
+    console.error("Error creating post:", err);
+  }
 }
 
 // ==========================================
-// 6. UPLOAD / POST SUBMISSION
-// ==========================================
-const uploadFormElement = document.getElementById('upload-form');
-if (uploadFormElement) {
-  uploadFormElement.addEventListener('submit', async function(e) {
-    e.preventDefault();
-
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    const authorName = user?.user_metadata?.full_name || user?.email || "Anonymous";
-
-    const category = document.getElementById('post-category').value;
-    const text = document.getElementById('post-text').value;
-    const image = document.getElementById('post-image').value;
-    const video = document.getElementById('post-video').value;
-
-    const newPost = {
-      id: Date.now(), // Unique ID para sa madaling pag-delete
-      author: authorName,
-      date: new Date().toLocaleDateString('tl-PH'),
-      text: text,
-      image: image,
-      video: video,
-      category: category
-    };
-
-    let posts = JSON.parse(localStorage.getItem('campus_posts')) || [];
-    posts.unshift(newPost);
-    localStorage.setItem('campus_posts', JSON.stringify(posts));
-
-    document.getElementById('upload-form').reset();
-    closePostModal();
-    loadPosts();
-    filterPosts(category);
-  });
-}
-
-// ==========================================
-// 7. ADMIN FEATURE: DELETE POST
+// 5. DELETE POST FUNCTION
 // ==========================================
 async function deletePost(postId) {
   if (!confirm("Sigurado ka bang gusto mong burahin ang post na ito?")) return;
 
-  let posts = JSON.parse(localStorage.getItem('campus_posts')) || [];
-  posts = posts.filter(post => post.id !== postId);
-  localStorage.setItem('campus_posts', JSON.stringify(posts));
+  try {
+    const { error } = await supabaseClient
+      .from('posts')
+      .delete()
+      .eq('id', postId);
 
-  loadPosts();
-  checkUrlParameters();
-}
-
-// ==========================================
-// 8. LOAD POSTS FOR HOMEPAGE
-// ==========================================
-async function loadPosts() {
-  const posts = JSON.parse(localStorage.getItem('campus_posts')) || [];
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  
-  let isAdmin = false;
-  if (user) {
-    const userHash = await hashEmail(user.email);
-    isAdmin = (userHash === ADMIN_EMAIL_HASH);
-  }
-
-  const containerAcademics = document.getElementById('posts-academics');
-  const containerSports = document.getElementById('posts-sports');
-  const containerEvents = document.getElementById('posts-events');
-
-  if (containerAcademics) containerAcademics.innerHTML = '';
-  if (containerSports) containerSports.innerHTML = '';
-  if (containerEvents) containerEvents.innerHTML = '';
-
-  posts.forEach(post => {
-    const deleteBtnHTML = isAdmin ? `<button onclick="deletePost(${post.id})" style="background:#ef4444; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem; margin-top:8px;">🗑️ Burahin ang Post</button>` : '';
-
-    const postHTML = `
-      <div class="user-post">
-        <div class="user-post-author">📌 ${post.author} (${post.date})</div>
-        <p>${post.text}</p>
-        ${post.image ? `<img src="${post.image}" alt="Uploaded Image">` : ''}
-        ${post.video ? `<iframe src="${post.video}"></iframe>` : ''}
-        ${deleteBtnHTML}
-      </div>
-    `;
-
-    if (post.category === 'Academics & Clubs' && containerAcademics) {
-      containerAcademics.innerHTML += postHTML;
-    } else if (post.category === 'Sports & Athletics' && containerSports) {
-      containerSports.innerHTML += postHTML;
-    } else if (post.category === 'Events & Activities' && containerEvents) {
-      containerEvents.innerHTML += postHTML;
-    }
-  });
-}
-
-// ==========================================
-// 9. FILTER POSTS FOR FEED.HTML
-// ==========================================
-function checkUrlParameters() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const categoryParam = urlParams.get('cat');
-
-  if (categoryParam) {
-    if (categoryParam === 'Academics') filterPosts('Academics & Clubs');
-    else if (categoryParam === 'Sports') filterPosts('Sports & Athletics');
-    else if (categoryParam === 'Events') filterPosts('Events & Activities');
-  } else {
-    filterPosts('All');
-  }
-}
-
-async function filterPosts(selectedCategory) {
-  const feedContainer = document.getElementById('all-posts-feed');
-  if (!feedContainer) return;
-
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  let isAdmin = false;
-  if (user) {
-    const userHash = await hashEmail(user.email);
-    isAdmin = (userHash === ADMIN_EMAIL_HASH);
-  }
-
-  const buttons = document.querySelectorAll('.filter-btn');
-  buttons.forEach(btn => {
-    if (btn.innerText.includes(selectedCategory) || (selectedCategory === 'All' && btn.innerText === 'Lahat')) {
-      btn.classList.add('active');
+    if (error) {
+      alert("Nagka-error sa pagbura: " + error.message);
     } else {
-      btn.classList.remove('active');
+      alert("Matagumpay na nabura ang post!");
+      fetchPosts('All'); // Refresh posts matapos magbura
     }
-  });
-
-  const posts = JSON.parse(localStorage.getItem('campus_posts')) || [];
-  feedContainer.innerHTML = '';
-
-  const filtered = selectedCategory === 'All' 
-    ? posts 
-    : posts.filter(p => p.category === selectedCategory);
-
-  if (filtered.length === 0) {
-    feedContainer.innerHTML = `<p class="empty-state">Wala pang naitatalang post sa kategoryang ito.</p>`;
-    return;
-  }
-
-  filtered.forEach(post => {
-    const deleteBtnHTML = isAdmin ? `<button onclick="deletePost(${post.id})" style="background:#ef4444; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem; margin-top:8px;">🗑️ Burahin ang Post</button>` : '';
-
-    const postHTML = `
-      <div class="feed-card">
-        <div class="feed-card-header">
-          <span class="feed-author">📌 ${post.author} (${post.date})</span>
-          <span class="feed-category-tag">${post.category}</span>
-        </div>
-        <p>${post.text}</p>
-        ${post.image ? `<img src="${post.image}" alt="Uploaded Image">` : ''}
-        ${post.video ? `<iframe src="${post.video}" frameborder="0" allowfullscreen></iframe>` : ''}
-        ${deleteBtnHTML}
-      </div>
-    `;
-    feedContainer.innerHTML += postHTML;
-  });
-}
-
-// ==========================================
-// 10. DYNAMIC SCHOOL YEAR & HERO CAROUSEL
-// ==========================================
-function updateDynamicSchoolYear() {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-
-  let startYear = currentYear;
-  let endYear = currentYear + 1;
-
-  if (currentMonth < 5) { 
-    startYear = currentYear - 1;
-    endYear = currentYear;
-  }
-
-  const syElement = document.getElementById('sy-badge');
-  if (syElement) {
-    syElement.innerText = `School Year ${startYear} – ${endYear}`;
+  } catch (err) {
+    console.error("Error deleting post:", err);
   }
 }
 
-const mySchoolPictures = [
-  "pnhs1.jpg",
-  "pnhs2.jpg",
-  "pnhs3.jpg"
-];
+// ==========================================
+// 6. FILTER & MODAL CONTROLS
+// ==========================================
+function filterPosts(category) {
+  const buttons = document.querySelectorAll('.filter-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
 
-let currentBgIndex = 0;
+  fetchPosts(category);
+}
 
-function startSchoolCarousel() {
-  const heroSection = document.getElementById('hero');
-  if (!heroSection) return;
+function openPostModal(category = 'Academics & Clubs') {
+  const modal = document.getElementById("post-modal");
+  const categoryInput = document.getElementById("post-category");
+  
+  if (categoryInput) categoryInput.value = category;
+  if (modal) modal.style.display = "flex";
+}
 
-  heroSection.style.backgroundImage = `url('${mySchoolPictures[0]}')`;
+function closePostModal() {
+  const modal = document.getElementById("post-modal");
+  if (modal) modal.style.display = "none";
+}
 
-  setInterval(() => {
-    currentBgIndex = (currentBgIndex + 1) % mySchoolPictures.length;
-    heroSection.style.backgroundImage = `url('${mySchoolPictures[currentBgIndex]}')`;
-  }, 5000);
+function handleLogout() {
+  if (confirm("Sigurado ka bang gusto mong mag-logout?")) {
+    localStorage.removeItem("loggedInUser");
+    window.location.href = "index.html";
+  }
 }
