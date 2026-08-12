@@ -253,3 +253,26 @@ function handleLogout() {
     window.location.href = "index.html";
   }
 }
+
+// ==========================================
+// 7. LOGIN / AUTHENTICATION HANDLER
+// ==========================================
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+
+  // Kunin ang inilagay na Email o LRN
+  const emailInput = document.querySelector('input[type="text"], input[type="email"]');
+  const userIdentifier = emailInput ? emailInput.value : "User";
+
+  if (!userIdentifier.trim()) {
+    alert("Mangyaring ilagay ang iyong LRN o DepEd Email.");
+    return;
+  }
+
+  // 1. I-save ang nag-login na user sa localStorage
+  localStorage.setItem("loggedInUser", userIdentifier);
+
+  // 2. Magpakita ng tagumpay na mensahe at lumipat sa feed.html
+  alert("Maligayang pagbabalik! Pagpasok sa portal...");
+  window.location.href = "feed.html";
+}
