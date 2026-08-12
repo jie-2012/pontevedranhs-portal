@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pontevedra National High School - Official Portal</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header>
+    <nav class="navbar">
+      <div class="logo">
+        <img src="logo.png" alt="Pontevedra NHS Logo" style="width: 40px; height: 40px; object-fit: contain;">
+        <span>Pontevedra NHS</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#campus-life">Campus Life</a></li>
+        <li><a href="#login" class="login-btn" id="nav-login-btn">Login</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Hero Section na may Background Carousel -->
+  <section id="hero" class="hero">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <span id="sy-badge" class="sy-badge">School Year 2026 – 2027</span>
+      <h1>Pontevedra National High School</h1>
+      <p>ARRIBA!, Padayon sa Pag Arriba Pontevedra NHS.</p>
+      <a href="#about" class="hero-btn">Alamin ang Mas Marami</a>
+    </div>
+  </section>
+
+  <!-- Section: Tungkol sa Paaralan -->
+  <section id="about" class="section">
+    <div class="container">
+      <h2>Tungkol sa Paaralan</h2>
+      <p class="section-subtitle">
+        Pontevedra National High School | SY 2026 – 2027<br>
+        📧 DepEd Email: <strong>302677@deped.gov.ph</strong>
+      </p>
+
+      <div class="cards-grid">
+        <!-- DepEd Vision Card -->
+        <div class="card">
+          <h3>👁️ DepEd Vision</h3>
+          <p>
+            We dream of Filipinos who passionately love their country and whose values and competencies enable them to realize their full potential and contribute meaningfully to building the nation. As a learner-centered public institution, the Department of Education continuously improves itself to better serve its stakeholders.
+          </p>
+        </div>
+
+        <!-- DepEd Mission Card -->
+        <div class="card">
+          <h3>🎯 DepEd Mission</h3>
+          <p>
+            To protect and promote the right of every Filipino to quality, equitable, culture-based, and complete basic education where:
+          </p>
+          <ul style="text-align: left; margin-top: 10px; padding-left: 20px; color: #475569; font-size: 0.95rem;">
+            <li><strong>Students</strong> learn in a child-friendly, gender-sensitive, safe, and motivating environment.</li>
+            <li><strong>Teachers</strong> facilitate learning and constantly nurture every learner.</li>
+            <li><strong>Administrators and staff</strong>, as stewards of the institution, ensure an enabling and supportive environment for effective learning to happen.</li>
+            <li><strong>Family, community, and other stakeholders</strong> are actively engaged and share responsibility for developing life-long learners.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- DepEd Core Values -->
+      <div class="core-values-box" style="margin-top: 30px;">
+        <h3>DepEd Core Values</h3>
+        <div class="values-tags">
+          <span class="value-tag">Maka-Diyos</span>
+          <span class="value-tag">Maka-tao</span>
+          <span class="value-tag">Makakalikasan</span>
+          <span class="value-tag">Makabansa</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Campus Life -->
+  <section id="campus-life" class="section gray-bg">
+    <div class="container">
+      <h2>Campus Life</h2>
+      <p class="section-subtitle">Tingnan o mag-post ng mga balita at larawan ngayong araw.</p>
+      
+      <div class="cards-grid">
+        <!-- Card 1: Academics & Clubs -->
+        <div class="card">
+          <h3>🎨 Academics & Clubs</h3>
+          <p>Maraming organisasyon at aktibidad para sa mga estudyante ng PNHS.</p>
+          <div style="display: flex; gap: 8px; margin-top: 15px;">
+            <button class="action-btn" onclick="openPostModal('Academics & Clubs')">➕ Mag-post</button>
+            <button class="action-btn" style="background-color: #0f172a;" onclick="window.location.href='feed.html?cat=Academics'">Tingnan Posts →</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Sports & Athletics -->
+        <div class="card">
+          <h3>🏆 Sports & Athletics</h3>
+          <p>Makiisa sa iba't ibang larangan ng palakasan at suportahan ang ating varsity.</p>
+          <div style="display: flex; gap: 8px; margin-top: 15px;">
+            <button class="action-btn" onclick="openPostModal('Sports & Athletics')">➕ Mag-post</button>
+            <button class="action-btn" style="background-color: #0f172a;" onclick="window.location.href='feed.html?cat=Sports'">Tingnan Posts →</button>
+          </div>
+        </div>
+
+        <!-- Card 3: Events & Activities -->
+        <div class="card">
+          <h3>🎉 Events & Activities</h3>
+          <p>Mga taunang pagdiriwang, Nutrition Month, at school activities.</p>
+          <div style="display: flex; gap: 8px; margin-top: 15px;">
+            <button class="action-btn" onclick="openPostModal('Events & Activities')">➕ Mag-post</button>
+            <button class="action-btn" style="background-color: #0f172a;" onclick="window.location.href='feed.html?cat=Events'">Tingnan Posts →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal/Pop-up Form para sa Upload / Post -->
+  <div id="post-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closePostModal()">&times;</span>
+      <h3 id="modal-category-title">Mag-add ng Post</h3>
+      
+      <form id="upload-form">
+        <input type="hidden" id="post-category">
+        
+        <div class="input-group">
+          <label>Anunsyo / Caption:</label>
+          <textarea id="post-text" placeholder="Isulat ang detalye o balita..." required></textarea>
+        </div>
+
+        <div class="input-group">
+          <label>Image URL (Optional):</label>
+          <input type="url" id="post-image" placeholder="Halimbawa: https://i.imgur.com/example.jpg">
+        </div>
+
+        <div class="input-group">
+          <label>YouTube Video Link (Optional):</label>
+          <input type="url" id="post-video" placeholder="Halimbawa: https://www.youtube.com/embed/VIDEO_ID">
+        </div>
+
+        <button type="submit" class="submit-btn">I-post Ngayon</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Section 4: Login & Register (Single Clean Card na may Switcher sa Ilalim) -->
+  <section id="login" class="section">
+    <div class="login-container">
+      
+      <!-- HEADER -->
+      <h2 id="auth-title">Portal Login</h2>
+      <p class="login-subtitle" id="auth-subtitle">Pontevedra NHS Student & Faculty Access</p>
+
+      <!-- AUTH FORM -->
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        
+        <!-- FULL NAME (Lalabas lang kapag nasa Register mode) -->
+        <div class="input-group" id="fullname-group" style="display: none;">
+          <label for="reg-fullname">Buong Pangalan</label>
+          <input type="text" id="reg-fullname" placeholder="Juan Dela Cruz">
+        </div>
+
+        <!-- LRN / EMAIL -->
+        <div class="input-group">
+          <label for="auth-username">LRN / DepEd Email</label>
+          <input type="text" id="auth-username" placeholder="juan.delacruz@deped.gov.ph" required>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="input-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="••••••••" required>
+        </div>
+
+        <!-- SUBMIT BUTTON -->
+        <button type="submit" class="submit-btn" id="auth-submit-btn">Mag-login</button>
+      </form>
+
+      <!-- FOOTER LINK SA ILALIM -->
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center;">
+        <p id="auth-toggle-text" style="font-size: 0.9rem; color: #64748b;">
+          Wala pang account? 
+          <a href="#" id="toggle-auth-btn" onclick="toggleAuthMode(event)" style="color: #1e3a8a; font-weight: bold; text-decoration: none;">Mag-register dito</a>
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; SY 2026–2027 Pontevedra National High School (School ID: 302677). All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
