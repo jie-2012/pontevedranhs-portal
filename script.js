@@ -17,7 +17,7 @@ function escapeHTML(str) {
 }
 
 function formatDisplayName(rawUser) {
-  if (!rawUser) return "Admin";
+  if (!rawUser || rawUser.toLowerCase() === 'guest') return "Guest";
   let name = String(rawUser).trim();
   if (name.toLowerCase().includes("admin") || name.toLowerCase().includes("junjie")) return "Admin";
   if (name.includes(' - ')) name = name.split(' - ')[0];
@@ -26,15 +26,21 @@ function formatDisplayName(rawUser) {
 }
 
 // ==========================================
-// 2. USER SESSION
+// 2. USER SESSION (GUEST BY DEFAULT)
 // ==========================================
 let storedUser = localStorage.getItem("loggedInUser");
-let currentUserRaw = storedUser || "admin@deped.gov.ph"; 
-let currentUserDisplay = formatDisplayName(currentUserRaw);
+let currentUserRaw = storedUser || "Guest"; 
+let currentUserDisplay = storedUser ? formatDisplayName(storedUser) : "Guest";
 
 document.addEventListener("DOMContentLoaded", () => {
   const navUsername = document.getElementById("nav-username");
   if (navUsername) navUsername.innerText = currentUserDisplay;
+
+  // Itago ang "Gumawa ng Post" button kapag Guest
+  const createPostBtn = document.querySelector("button[onclick*='openPostModal']");
+  if (createPostBtn && !storedUser) {
+    createPostBtn.style.display = "none";
+  }
 
   if (document.getElementById("all-posts-feed")) fetchPosts('All');
 
@@ -78,8 +84,9 @@ function renderPostCard(post) {
   const displayAuthor = formatDisplayName(rawAuthor);
   const postDate = post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Ngayon';
 
-  const isOwner = (currentUserRaw.toLowerCase() === rawAuthor.toLowerCase());
-  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || currentUserDisplay.toLowerCase().includes("admin") || currentUserRaw.toLowerCase().includes("junjie"));
+  // I-verify kung admin o owner ang tumitingin para sa delete button
+  const isOwner = storedUser && (currentUserRaw.toLowerCase() === rawAuthor.toLowerCase());
+  const isAdmin = storedUser && (currentUserRaw.toLowerCase().includes("admin") || currentUserDisplay.toLowerCase().includes("admin") || currentUserRaw.toLowerCase().includes("junjie"));
 
   const deleteBtnHTML = (isOwner || isAdmin)
     ? `<button onclick="deletePost('${post.id}')" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;">🗑️ Burahin</button>`
@@ -151,6 +158,8 @@ function renderPostCard(post) {
 // 4. LIKE, HEART & COMMENT ACTIONS
 // ==========================================
 async function toggleReaction(postId, type) {
+  if (!storedUser) return alert("Mag-login muna para makapag-react.");
+
   const { data: existing } = await supabaseClient
     .from('reactions')
     .select('*')
@@ -175,6 +184,7 @@ async function addComment(postId) {
   const input = document.getElementById(`comment-input-${postId}`);
   const text = input ? input.value.trim() : "";
 
+  if (!storedUser) return alert("Mag-login muna para makapag-comment.");
   if (!text) return alert("Maglagay ng komento.");
 
   const { error } = await supabaseClient
@@ -194,6 +204,8 @@ async function addComment(postId) {
 // ==========================================
 async function handleCreatePost(event) {
   event.preventDefault();
+  if (!storedUser) return alert("Mag-login muna bilang Admin.");
+
   const textInput = document.getElementById("post-text");
   const fileInput = document.getElementById("post-file");
   const categoryInput = document.getElementById("post-category");
@@ -224,6 +236,7 @@ async function handleCreatePost(event) {
 }
 
 async function deletePost(postId) {
+  if (!storedUser) return alert("Wala kang permiso na magbura ng post.");
   if (!confirm("Sigurado ka bang gusto mong burahin ang post na ito?")) return;
   await supabaseClient.from('posts').delete().eq('id', postId);
   fetchPosts('All');
