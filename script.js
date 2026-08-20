@@ -9,7 +9,6 @@ if (typeof supabase !== 'undefined') {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// Helper Function: Sanitize HTML para maiwasan ang XSS Injection
 function escapeHTML(str) {
   if (!str) return '';
   return String(str).replace(/[&<>'"]/g, 
@@ -17,29 +16,17 @@ function escapeHTML(str) {
   );
 }
 
-// Helper Function: Linisin ang email/identifier para Pangalan/Role lang ang idisplay
 function formatDisplayName(rawUser) {
   if (!rawUser) return "Admin";
-  
   let name = String(rawUser).trim();
-  
-  if (name.toLowerCase().includes("admin") || name.toLowerCase().includes("junjie")) {
-    return "Admin";
-  }
-
-  if (name.includes(' - ')) {
-    name = name.split(' - ')[0];
-  }
-  
-  if (name.includes('@')) {
-    name = name.split('@')[0];
-  }
-
+  if (name.toLowerCase().includes("admin") || name.toLowerCase().includes("junjie")) return "Admin";
+  if (name.includes(' - ')) name = name.split(' - ')[0];
+  if (name.includes('@')) name = name.split('@')[0];
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ==========================================
-// 2. USER SESSION & NAVBAR MANAGEMENT
+// 2. USER SESSION
 // ==========================================
 let storedUser = localStorage.getItem("loggedInUser");
 let currentUserRaw = storedUser || "admin@deped.gov.ph"; 
@@ -47,27 +34,16 @@ let currentUserDisplay = formatDisplayName(currentUserRaw);
 
 document.addEventListener("DOMContentLoaded", () => {
   const navUsername = document.getElementById("nav-username");
-  if (navUsername) {
-    navUsername.innerText = currentUserDisplay;
-  }
+  if (navUsername) navUsername.innerText = currentUserDisplay;
 
-  if (document.getElementById("all-posts-feed")) {
-    fetchPosts('All');
-  }
+  if (document.getElementById("all-posts-feed")) fetchPosts('All');
 
   const uploadForm = document.getElementById("upload-form");
-  if (uploadForm) {
-    uploadForm.addEventListener("submit", handleCreatePost);
-  }
-
-  const loginForm = document.querySelector('form[onsubmit*="handleAuthSubmit"]') || document.getElementById("login-form");
-  if (loginForm) {
-    loginForm.addEventListener("submit", handleAuthSubmit);
-  }
+  if (uploadForm) uploadForm.addEventListener("submit", handleCreatePost);
 });
 
 // ==========================================
-// 3. FETCH & DISPLAY POSTS
+// 3. FETCH & DISPLAY POSTS WITH REACTIONS & COMMENTS
 // ==========================================
 async function fetchPosts(category = 'All') {
   const feedGrid = document.getElementById("all-posts-feed");
@@ -76,22 +52,13 @@ async function fetchPosts(category = 'All') {
   feedGrid.innerHTML = "<p style='color: #64748b;'>Kina-karga ang mga anunsyo...</p>";
 
   try {
-    if (!supabaseClient) {
-      feedGrid.innerHTML = "<p style='color: #dc2626;'>Mali ang Supabase configuration. Paki-check ang SUPABASE_URL at SUPABASE_KEY.</p>";
-      return;
-    }
-
-    let query = supabaseClient.from('posts').select('*').order('created_at', { ascending: false });
-
-    if (category !== 'All') {
-      query = query.eq('category', category);
-    }
+    let query = supabaseClient.from('posts').select('*, reactions(*), comments(*)').order('created_at', { ascending: false });
+    if (category !== 'All') query = query.eq('category', category);
 
     const { data: posts, error } = await query;
-
     if (error) {
-      console.error("Error fetching posts:", error);
-      feedGrid.innerHTML = "<p style='color: #dc2626;'>Nagka-error sa pag-load ng mga post. Paki-check ang database table.</p>";
+      console.error(error);
+      feedGrid.innerHTML = "<p style='color: #dc2626;'>Nagka-error sa pag-load ng posts.</p>";
       return;
     }
 
@@ -101,10 +68,8 @@ async function fetchPosts(category = 'All') {
     }
 
     feedGrid.innerHTML = posts.map(post => renderPostCard(post)).join('');
-
   } catch (err) {
-    console.error("Unexpected error:", err);
-    feedGrid.innerHTML = "<p style='color: #dc2626;'>Nagkaroon ng hindi inaasahang error.</p>";
+    console.error(err);
   }
 }
 
@@ -114,53 +79,121 @@ function renderPostCard(post) {
   const postDate = post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Ngayon';
 
   const isOwner = (currentUserRaw.toLowerCase() === rawAuthor.toLowerCase());
-  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || 
-                   currentUserDisplay.toLowerCase().includes("admin") || 
-                   currentUserRaw.toLowerCase().includes("junjie"));
+  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || currentUserDisplay.toLowerCase().includes("admin") || currentUserRaw.toLowerCase().includes("junjie"));
 
   const deleteBtnHTML = (isOwner || isAdmin)
-    ? `<button class="delete-post-btn" onclick="deletePost('${post.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">🗑️ Burahin</button>`
+    ? `<button onclick="deletePost('${post.id}')" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;">🗑️ Burahin</button>`
     : '';
 
   let mediaHTML = '';
   if (post.image_url) {
     const safeUrl = escapeHTML(post.image_url);
-    const urlLower = safeUrl.toLowerCase();
-    if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.webm') || urlLower.endsWith('.mkv')) {
-      mediaHTML = `
-        <video controls style="max-width:100%; border-radius:8px; margin-top: 10px; display: block;">
-          <source src="${safeUrl}" type="video/mp4">
-          Hindi masuportahan ng iyong browser ang video player na ito.
-        </video>`;
+    if (safeUrl.match(/\.(mp4|mov|webm|mkv)$/i)) {
+      mediaHTML = `<video controls style="max-width:100%; border-radius:8px; margin-top:10px;"><source src="${safeUrl}"></video>`;
     } else {
-      mediaHTML = `<img src="${safeUrl}" alt="Post Media" style="max-width:100%; border-radius:8px; margin-top: 10px; display: block;" onerror="this.style.display='none'">`;
+      mediaHTML = `<img src="${safeUrl}" style="max-width:100%; border-radius:8px; margin-top:10px;">`;
     }
   }
 
-  const safeContent = escapeHTML(post.content || post.text || '');
-  const safeAuthor = escapeHTML(displayAuthor);
+  // Reactions count & user check
+  const likes = (post.reactions || []).filter(r => r.type === 'like');
+  const hearts = (post.reactions || []).filter(r => r.type === 'heart');
+  const userLiked = likes.some(r => r.user_identifier === currentUserRaw);
+  const userHearted = hearts.some(r => r.user_identifier === currentUserRaw);
+
+  // Comments HTML
+  const commentsList = (post.comments || []).map(c => `
+    <div style="background:#f1f5f9; padding:8px 12px; border-radius:8px; margin-top:6px; font-size:0.9rem;">
+      <strong style="color:#1e3a8a;">${escapeHTML(formatDisplayName(c.author))}</strong>: ${escapeHTML(c.content)}
+    </div>
+  `).join('');
 
   return `
-    <div class="post-card" style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: left;">
-      <div class="post-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="post-card" style="background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05); text-align:left;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <strong style="color: #1e3a8a; font-size: 1.1rem;">📌 ${safeAuthor}</strong> 
-          <small style="color: #64748b; margin-left: 5px;">(${postDate})</small>
+          <strong style="color:#1e3a8a;">📌 ${escapeHTML(displayAuthor)}</strong> 
+          <small style="color:#64748b;">(${postDate})</small>
         </div>
         ${deleteBtnHTML}
       </div>
-      <p style="margin: 15px 0; color: #334155; line-height: 1.5; white-space: pre-line;">${safeContent}</p>
+      <p style="margin:15px 0; color:#334155; line-height:1.5; white-space:pre-line;">${escapeHTML(post.content || '')}</p>
       ${mediaHTML}
+
+      <!-- Like & Heart Buttons -->
+      <div style="display:flex; gap:15px; margin-top:15px; border-top:1px solid #e2e8f0; padding-top:10px;">
+        <button onclick="toggleReaction('${post.id}', 'like')" style="background:none; border:none; cursor:pointer; font-weight:bold; color:${userLiked ? '#2563eb' : '#64748b'};">
+          👍 Like (${likes.length})
+        </button>
+        <button onclick="toggleReaction('${post.id}', 'heart')" style="background:none; border:none; cursor:pointer; font-weight:bold; color:${userHearted ? '#dc2626' : '#64748b'};">
+          ❤️ Heart (${hearts.length})
+        </button>
+        <button onclick="toggleCommentBox('${post.id}')" style="background:none; border:none; cursor:pointer; font-weight:bold; color:#64748b;">
+          💬 Komento (${(post.comments || []).length})
+        </button>
+      </div>
+
+      <!-- Comment Section -->
+      <div id="comments-section-${post.id}" style="display:none; margin-top:10px;">
+        <div style="max-height:150px; overflow-y:auto; margin-bottom:10px;">
+          ${commentsList || "<p style='font-size:0.85rem; color:#94a3b8;'>Wala pang komento.</p>"}
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="comment-input-${post.id}" placeholder="Isulat ang komento..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+          <button onclick="addComment('${post.id}')" style="background:#1e3a8a; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Ipadala</button>
+        </div>
+      </div>
     </div>
   `;
 }
 
 // ==========================================
-// 4. CREATE POST FUNCTION
+// 4. LIKE, HEART & COMMENT ACTIONS
+// ==========================================
+async function toggleReaction(postId, type) {
+  const { data: existing } = await supabaseClient
+    .from('reactions')
+    .select('*')
+    .eq('post_id', postId)
+    .eq('user_identifier', currentUserRaw)
+    .eq('type', type);
+
+  if (existing && existing.length > 0) {
+    await supabaseClient.from('reactions').delete().eq('id', existing[0].id);
+  } else {
+    await supabaseClient.from('reactions').insert([{ post_id: postId, user_identifier: currentUserRaw, type: type }]);
+  }
+  fetchPosts('All');
+}
+
+function toggleCommentBox(postId) {
+  const box = document.getElementById(`comments-section-${postId}`);
+  if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addComment(postId) {
+  const input = document.getElementById(`comment-input-${postId}`);
+  const text = input ? input.value.trim() : "";
+
+  if (!text) return alert("Maglagay ng komento.");
+
+  const { error } = await supabaseClient
+    .from('comments')
+    .insert([{ post_id: postId, author: currentUserRaw, content: text }]);
+
+  if (error) {
+    alert("Nagka-error sa pag-comment: " + error.message);
+  } else {
+    input.value = "";
+    fetchPosts('All');
+  }
+}
+
+// ==========================================
+// 5. POST & DELETE HANDLERS
 // ==========================================
 async function handleCreatePost(event) {
   event.preventDefault();
-
   const textInput = document.getElementById("post-text");
   const fileInput = document.getElementById("post-file");
   const categoryInput = document.getElementById("post-category");
@@ -169,141 +202,38 @@ async function handleCreatePost(event) {
   const file = fileInput && fileInput.files[0] ? fileInput.files[0] : null;
   const category = categoryInput ? categoryInput.value : "Academics";
 
-  if (!text.trim()) {
-    alert("Mangyaring maglagay ng mensahe.");
-    return;
-  }
+  if (!text.trim()) return alert("Maglagay ng mensahe.");
 
   let imageUrl = null;
-
-  try {
-    if (file) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { data: uploadData, error: uploadError } = await supabaseClient
-        .storage
-        .from('post-images')
-        .upload(fileName, file);
-
-      if (uploadError) {
-        alert("Nagka-error sa pag-upload ng media: " + uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabaseClient
-        .storage
-        .from('post-images')
-        .getPublicUrl(fileName);
-
-      imageUrl = publicUrlData.publicUrl;
-    }
-
-    const { error: insertError } = await supabaseClient
-      .from('posts')
-      .insert([
-        {
-          author: currentUserRaw, 
-          content: text,
-          image_url: imageUrl,
-          category: category
-        }
-      ]);
-
-    if (insertError) {
-      alert("Nagka-error sa pag-save ng post: " + insertError.message);
-    } else {
-      alert("Matagumpay na na-post ang anunsyo!");
-      closePostModal();
-      if (textInput) textInput.value = "";
-      if (fileInput) fileInput.value = "";
-      fetchPosts('All');
-    }
-
-  } catch (err) {
-    console.error("Error creating post:", err);
+  if (file) {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const { error: uploadError } = await supabaseClient.storage.from('post-images').upload(fileName, file);
+    if (uploadError) return alert("Upload error: " + uploadError.message);
+    
+    const { data: publicUrlData } = supabaseClient.storage.from('post-images').getPublicUrl(fileName);
+    imageUrl = publicUrlData.publicUrl;
   }
+
+  await supabaseClient.from('posts').insert([{ author: currentUserRaw, content: text, image_url: imageUrl, category: category }]);
+  alert("Matagumpay na na-post!");
+  closePostModal();
+  if (textInput) textInput.value = "";
+  if (fileInput) fileInput.value = "";
+  fetchPosts('All');
 }
 
-// ==========================================
-// 5. DELETE POST FUNCTION
-// ==========================================
 async function deletePost(postId) {
   if (!confirm("Sigurado ka bang gusto mong burahin ang post na ito?")) return;
-
-  try {
-    const { error } = await supabaseClient
-      .from('posts')
-      .delete()
-      .eq('id', postId);
-
-    if (error) {
-      alert("Nagka-error sa pagbura: " + error.message);
-    } else {
-      alert("Matagumpay na nabura ang post!");
-      fetchPosts('All');
-    }
-  } catch (err) {
-    console.error("Error deleting post:", err);
-  }
+  await supabaseClient.from('posts').delete().eq('id', postId);
+  fetchPosts('All');
 }
 
-// ==========================================
-// 6. FILTER, MODAL & LOGOUT CONTROLS
-// ==========================================
-function filterPosts(category, evt) {
-  const buttons = document.querySelectorAll('.filter-btn');
-  buttons.forEach(btn => btn.classList.remove('active'));
-  
-  const currentEvent = evt || window.event;
-  if (currentEvent && currentEvent.target) {
-    currentEvent.target.classList.add('active');
-  }
-
-  fetchPosts(category);
-}
-
-function openPostModal(category = 'Academics') {
-  const modal = document.getElementById("post-modal");
-  const categoryInput = document.getElementById("post-category");
-  
-  if (categoryInput) categoryInput.value = category;
-  if (modal) modal.style.display = "flex";
-}
-
-function closePostModal() {
-  const modal = document.getElementById("post-modal");
-  if (modal) modal.style.display = "none";
-}
-
+function openPostModal() { document.getElementById("post-modal").style.display = "flex"; }
+function closePostModal() { document.getElementById("post-modal").style.display = "none"; }
 window.handleLogout = function() {
-  if (confirm("Sigurado ka bang gusto mong mag-logout?")) {
+  if (confirm("Mag-logout?")) {
     localStorage.removeItem("loggedInUser");
     window.location.href = "index.html";
   }
 };
-
-// ==========================================
-// 7. LOGIN / AUTHENTICATION HANDLER
-// ==========================================
-async function handleAuthSubmit(event) {
-  event.preventDefault();
-
-  const inputs = event.target.querySelectorAll('input');
-  let userIdentifier = "";
-
-  inputs.forEach(input => {
-    if (input.type !== 'password' && input.type !== 'submit' && input.value.trim() !== "") {
-      userIdentifier = input.value.trim();
-    }
-  });
-
-  if (!userIdentifier) {
-    alert("Mangyaring ilagay ang iyong LRN o DepEd Email.");
-    return;
-  }
-
-  localStorage.setItem("loggedInUser", userIdentifier);
-  alert("Maligayang pagbabalik! Pagpasok sa portal...");
-  window.location.href = "feed.html";
-}
