@@ -9,131 +9,30 @@ if (typeof supabase !== 'undefined') {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// Helper Function: Linisin at ayusin ang pangalan ng nag-post
-function formatDisplayName(rawUser) {
-  if (!rawUser) return "Estudyante";
-  
-  let name = String(rawUser).trim();
-  
-  // Kung naglalaman ng 'admin', tiyaking "Admin" ang lalabas
-  if (name.toLowerCase().includes("admin") || name.toLowerCase().includes("junjie.magada")) {
-    return "Admin";
-  }
-  
-  // Kung may email symbol ('@'), kunin lang ang bago ang '@'
-  if (name.includes('@')) {
-    name = name.split('@')[0];
-  }
-
-  // Kung may '-' tulad ng "Admin - junjie", linisin
-  if (name.includes(' - ')) {
-    name = name.split(' - ')[0];
-  }
-
-  // I-capitalize ang unang letra
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
-// ==========================================
-// 2. USER SESSION & NAVBAR MANAGEMENT
-// ==========================================
-let storedUser = localStorage.getItem("loggedInUser");
-let currentUserRaw = "Estudyante"; 
-let currentUserDisplay = "Estudyante"; 
-
-if (storedUser) {
-  try {
-    let parsedData = JSON.parse(storedUser);
-    currentUserRaw = parsedData.name || parsedData.email || storedUser;
-  } catch (e) {
-    currentUserRaw = storedUser;
-  }
-}
-
-currentUserDisplay = formatDisplayName(currentUserRaw);
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Update Username sa Navbar
-  const navUsername = document.getElementById("nav-username");
-  if (navUsername) {
-    navUsername.innerText = currentUserDisplay;
-  }
-
-  // Load Posts sa Feed
-  if (document.getElementById("all-posts-feed")) {
-    fetchPosts('All');
-  }
-
-  // Event Listener para sa Post Form (Upload)
-  const uploadForm = document.getElementById("upload-form");
-  if (uploadForm) {
-    uploadForm.addEventListener("submit", handleCreatePost);
-  }
-
-  // Event Listener para sa Auth Form
-  const loginForm = document.querySelector('form[onsubmit*="handleAuthSubmit"]') || document.getElementById("login-form");
-  if (loginForm) {
-    loginForm.addEventListener("submit", handleAuthSubmit);
-  }
-});
-
-// ==========================================
-// 3. FETCH & DISPLAY POSTS
-// ==========================================
-async function fetchPosts(category = 'All') {
-  const feedGrid = document.getElementById("all-posts-feed");
-  if (!feedGrid) return;
-
-  feedGrid.innerHTML = "<p style='color: #64748b;'>Kina-karga ang mga anunsyo...</p>";
-
-  try {
-    if (!supabaseClient) {
-      feedGrid.innerHTML = "<p style='color: #dcMay ilang critical vulnerabilities at bugs sa iyong code. Narito ang mga kailangang ayusin:
-
-1. **Security Vulnerabilities (Cross-Site Scripting - XSS):** Ang paggamit ng `${post.content}` sa `.innerHTML` o `map().join('')` ay pwedeng pasukan ng malicious JavaScript code ng ibang user.
-2. **Logic Bug sa Post Creation (Author Mismatch):** Sa `handleCreatePost`, pinalitan mo ang `author` gamit ang `currentUserDisplay` sa halip na `currentUserRaw`. Pagkatapos mag-refresh ng page, hindi na ma-de-delete ng user ang sarili niyang post dahil ang ownership check ay kumakaparar sa `currentUserRaw`.
-3. **Event Handler Bug sa `filterPosts`:** Ang `event.target` ay maaaring magdulot ng error kung ang function ay tinawag mula sa inline code na walang pasa-pasang `event` object.
-
----
-
-### Inayos na Script (Corrected Script)
-
-```javascript
-// ==========================================
-// 1. SUPABASE INITIALIZATION
-// ==========================================
-const SUPABASE_URL = '[https://vykcbiupbdtegtcdtzda.supabase.co](https://vykcbiupbdtegtcdtzda.supabase.co)';
-const SUPABASE_KEY = 'sb_publishable_OEUink5V4daPeQbXuNlyAw_bCehIOZd';
-
-let supabaseClient = null;
-if (typeof supabase !== 'undefined') {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-}
-
 // Helper Function: Sanitize HTML para maiwasan ang XSS Injection
 function escapeHTML(str) {
   if (!str) return '';
-  return str.replace(/[&<>'"]/g, 
+  return String(str).replace(/[&<>'"]/g, 
     tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
   );
 }
 
 // Helper Function: Linisin ang email/identifier para Pangalan/Role lang ang idisplay
 function formatDisplayName(rawUser) {
-  if (!rawUser) return "Estudyante";
+  if (!rawUser) return "Admin";
   
-  let name = rawUser.trim();
+  let name = String(rawUser).trim();
   
+  if (name.toLowerCase().includes("admin") || name.toLowerCase().includes("junjie")) {
+    return "Admin";
+  }
+
   if (name.includes(' - ')) {
     name = name.split(' - ')[0];
   }
   
   if (name.includes('@')) {
     name = name.split('@')[0];
-  }
-
-  if (name.toLowerCase().includes("admin")) {
-    return "Admin";
   }
 
   return name.charAt(0).toUpperCase() + name.slice(1);
@@ -143,19 +42,8 @@ function formatDisplayName(rawUser) {
 // 2. USER SESSION & NAVBAR MANAGEMENT
 // ==========================================
 let storedUser = localStorage.getItem("loggedInUser");
-let currentUserRaw = "Estudyante";
-let currentUserDisplay = "Estudyante";
-
-if (storedUser) {
-  try {
-    let parsedData = JSON.parse(storedUser);
-    currentUserRaw = parsedData.name || parsedData.email || storedUser;
-  } catch (e) {
-    currentUserRaw = storedUser;
-  }
-}
-
-currentUserDisplay = formatDisplayName(currentUserRaw);
+let currentUserRaw = storedUser || "admin@deped.gov.ph"; 
+let currentUserDisplay = formatDisplayName(currentUserRaw);
 
 document.addEventListener("DOMContentLoaded", () => {
   const navUsername = document.getElementById("nav-username");
@@ -221,16 +109,17 @@ async function fetchPosts(category = 'All') {
 }
 
 function renderPostCard(post) {
-  const rawAuthor = post.author || "Anonymous";
+  const rawAuthor = post.author || "Admin";
   const displayAuthor = formatDisplayName(rawAuthor);
   const postDate = post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Ngayon';
 
-  // Inayos ang Ownership at Admin Check
   const isOwner = (currentUserRaw.toLowerCase() === rawAuthor.toLowerCase());
-  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || currentUserDisplay.toLowerCase().includes("admin"));
+  const isAdmin = (currentUserRaw.toLowerCase().includes("admin") || 
+                   currentUserDisplay.toLowerCase().includes("admin") || 
+                   currentUserRaw.toLowerCase().includes("junjie"));
 
   const deleteBtnHTML = (isOwner || isAdmin)
-    ? `<button class="delete-post-btn" onclick="deletePost('${post.id}')">🗑️ Burahin</button>`
+    ? `<button class="delete-post-btn" onclick="deletePost('${post.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">🗑️ Burahin</button>`
     : '';
 
   let mediaHTML = '';
@@ -248,20 +137,19 @@ function renderPostCard(post) {
     }
   }
 
-  // Inapply ang escapeHTML para maiwasan ang XSS
   const safeContent = escapeHTML(post.content || post.text || '');
   const safeAuthor = escapeHTML(displayAuthor);
 
   return `
-    <div class="post-card">
-      <div class="post-header">
+    <div class="post-card" style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: left;">
+      <div class="post-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <strong style="color: #1e3a8a;">📌 ${safeAuthor}</strong> 
+          <strong style="color: #1e3a8a; font-size: 1.1rem;">📌 ${safeAuthor}</strong> 
           <small style="color: #64748b; margin-left: 5px;">(${postDate})</small>
         </div>
         ${deleteBtnHTML}
       </div>
-      <p style="margin: 15px 0; color: #334155; line-height: 1.5;">${safeContent}</p>
+      <p style="margin: 15px 0; color: #334155; line-height: 1.5; white-space: pre-line;">${safeContent}</p>
       ${mediaHTML}
     </div>
   `;
@@ -279,7 +167,7 @@ async function handleCreatePost(event) {
 
   const text = textInput ? textInput.value : "";
   const file = fileInput && fileInput.files[0] ? fileInput.files[0] : null;
-  const category = categoryInput ? categoryInput.value : "Academics & Clubs";
+  const category = categoryInput ? categoryInput.value : "Academics";
 
   if (!text.trim()) {
     alert("Mangyaring maglagay ng mensahe.");
@@ -311,7 +199,6 @@ async function handleCreatePost(event) {
       imageUrl = publicUrlData.publicUrl;
     }
 
-    // CRITICAL FIX: Inimbak ang currentUserRaw sa halip na currentUserDisplay para sa tamang Delete Authorization
     const { error: insertError } = await supabaseClient
       .from('posts')
       .insert([
@@ -362,7 +249,7 @@ async function deletePost(postId) {
 }
 
 // ==========================================
-// 6. FILTER & MODAL CONTROLS
+// 6. FILTER, MODAL & LOGOUT CONTROLS
 // ==========================================
 function filterPosts(category, evt) {
   const buttons = document.querySelectorAll('.filter-btn');
@@ -376,7 +263,7 @@ function filterPosts(category, evt) {
   fetchPosts(category);
 }
 
-function openPostModal(category = 'Academics & Clubs') {
+function openPostModal(category = 'Academics') {
   const modal = document.getElementById("post-modal");
   const categoryInput = document.getElementById("post-category");
   
@@ -389,12 +276,12 @@ function closePostModal() {
   if (modal) modal.style.display = "none";
 }
 
-function handleLogout() {
+window.handleLogout = function() {
   if (confirm("Sigurado ka bang gusto mong mag-logout?")) {
     localStorage.removeItem("loggedInUser");
     window.location.href = "index.html";
   }
-}
+};
 
 // ==========================================
 // 7. LOGIN / AUTHENTICATION HANDLER
